@@ -1,0 +1,24 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+a
+# Environment
+.env
+
+# Logs
+*.log
+
+# Model (kalau pakai volume mount)
+*.pt
+
+# OS
+.DS_Store
+Thumbs.db
