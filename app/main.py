@@ -16,7 +16,7 @@ app = FastAPI(
 )
 
 MODEL_PATH = "asset-x-120.pt"
-MODEL_URL = "https://github.com/mirteldisa01/Asset-Discrepancy-NMSAI/releases/download/v1.0.0/asset-x-120.pt"
+MODEL_URL = "https://github.com/eldisja1/asset-discrepancy-nmsai/releases/download/v1.0.0/asset-x-120.pt"
 
 # ==============================
 # THREAD SAFETY CONFIG
