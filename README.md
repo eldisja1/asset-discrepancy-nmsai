@@ -1,4 +1,4 @@
-````markdown
+
 # Asset-Discrepancy-NMSAI
 
 Asset-Discrepancy-NMSAI is a production-ready AI microservice for automated telecom asset detection from images. The service processes image input, performs object detection using a YOLO-based model, and returns structured detection results along with an annotated image.
@@ -309,4 +309,3 @@ Future versions may include:
 ## License
 
 This project is proprietary and intended for controlled production deployment within NMSAI infrastructure.
-```
