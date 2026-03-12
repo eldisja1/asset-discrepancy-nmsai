@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 import numpy as np
 import cv2
 import os
-import requests
 import base64
 import threading
 
@@ -16,7 +15,6 @@ app = FastAPI(
 )
 
 MODEL_PATH = "asset-x-120.pt"
-MODEL_URL = "https://github.com/eldisja1/asset-discrepancy-nmsai/releases/download/v1.0.0/asset-x-120.pt"
 
 # ==============================
 # THREAD SAFETY CONFIG
@@ -26,29 +24,14 @@ batch_semaphore = threading.Semaphore(10)  # Max 10 concurrent at a time
 
 
 # ==============================
-# Download Model Jika Tidak Ada
-# ==============================
-def download_model():
-    print("Downloading model from GitHub Release...")
-    response = requests.get(MODEL_URL, stream=True)
-
-    if response.status_code != 200:
-        raise RuntimeError("Failed to download model")
-
-    with open(MODEL_PATH, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-
-    print("Model downloaded successfully")
-
-
-# ==============================
 # Startup Event
 # ==============================
 @app.on_event("startup")
 def startup_event():
     if not os.path.exists(MODEL_PATH):
-        download_model()
+        raise RuntimeError(
+            "Model file not found. Ensure it is included in the Docker image."
+        )
 
     load_model(MODEL_PATH)
     print("Model loaded successfully")
