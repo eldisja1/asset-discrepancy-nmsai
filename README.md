@@ -308,4 +308,24 @@ Future versions may include:
 
 ## License
 
-This project is proprietary and intended for controlled production deployment within NMSAI infrastructure.
+Copyright (c) 2026 Eldisja Hadasa
+
+All rights reserved.
+
+This software and associated documentation files (the "Software") are proprietary and confidential.
+
+No part of this Software may be copied, modified, distributed, sublicensed, or used for commercial purposes without explicit written permission from the copyright holder.
+
+Unauthorized use, reproduction, or distribution of this software is strictly prohibited.
+
+---
+
+## Maintainer
+
+**Eldisja Hadasa**
+
+The **Asset-Discrepancy-NMSAI** project implements a containerized AI inference service for detecting and analyzing discrepancies between expected and actual assets in visual data, using FastAPI and YOLO, designed for CPU-efficient concurrent deployment with Docker and Gunicorn workers.
+
+
+- GitHub: https://github.com/eldisja1
+- LinkedIn: https://www.linkedin.com/in/eldisja-hadasa/
