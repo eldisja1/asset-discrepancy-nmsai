@@ -47,8 +47,8 @@ The service is built with FastAPI and designed for scalable backend deployment.
 
 The production model is distributed via GitHub Release.
 
-Version: `v1.0.0`  
-Model File: `asset-x-120.pt`
+Version: `v1.2.0`  
+Model File: `asset-11l-cp03-180.pt`
 
 The application automatically downloads the model at startup if it is not present locally.
 
@@ -61,9 +61,9 @@ Core configuration parameters are defined in the service code.
 ### Model Configuration
 
 ```python
-MODEL_PATH = "asset-x-120.pt"
+MODEL_PATH = "asset-11l-cp03-180.pt"
 
-MODEL_URL = "https://github.com/mirteldisa01/Asset-Discrepancy-NMSAI/releases/download/v1.0.0/asset-x-120.pt"
+MODEL_URL = "https://github.com/mirteldisa01/Asset-Discrepancy-NMSAI/releases/download/v1.2.0/asset-11l-cp03-180.pt"
 ```
 
 ### Concurrency Control
@@ -289,7 +289,7 @@ This endpoint can be used for container orchestration health monitoring.
 
 ## Versioning
 
-v1.0.0  
+### v1.0.0  
 Initial production release of the Asset Detection API including:
 
 - Thread-safe inference pipeline
@@ -297,12 +297,13 @@ Initial production release of the Asset Detection API including:
 - Annotated image generation
 - Dockerized deployment
 
-Future versions may include:
+Initial production release including core inference pipeline and model distribution.
 
-- GPU acceleration
-- Batch image processing
-- Asynchronous processing support
-- Horizontal scaling improvements
+### v1.2.0
+- Updated YOLO production model
+- Refined per-class detection logic and filtering rules
+- Added startup model initialization and auto-download behavior
+- Improved inference consistency and deployment readiness
 
 ---
 

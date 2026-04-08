@@ -1,7 +1,7 @@
 services:
   asset-api:
     build: .
-    container_name: asset_detection-api
+    container_name: asset-discrepancy-nmsai-api
     ports:
       - "8002:8000"
     restart: always
