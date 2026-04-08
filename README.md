@@ -63,7 +63,7 @@ Core configuration parameters are defined in the service code.
 ```python
 MODEL_PATH = "asset-11l-cp03-180.pt"
 
-MODEL_URL = "https://github.com/mirteldisa01/Asset-Discrepancy-NMSAI/releases/download/v1.2.0/asset-11l-cp03-180.pt"
+MODEL_URL = "https://github.com/eldisja1/Asset-Discrepancy-NMSAI/releases/download/v1.2.0/asset-11l-cp03-180.pt"
 ```
 
 ### Concurrency Control
