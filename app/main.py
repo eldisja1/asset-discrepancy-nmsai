@@ -37,8 +37,7 @@ app = FastAPI(
 # 1. Model Path
 # ==============================
 MODEL_PATH = "asset-11l-cp03-180.pt"
-MODEL_URL = "https://github.com/eldisja1/Asset-Discrepancy-NMSAI/releases/download/v1.1.0/asset-11l-cp03-180.pt"
-
+MODEL_URL = "https://github.com/eldisja1/asset-discrepancy-nmsai/releases/download/v1.2.0/asset-11l-cp03-180.pt"
 # ==============================
 # 2. Thread Safety Config
 # ==============================
