@@ -1,175 +1,215 @@
 """
 main.py
 
-FastAPI entry point for the Asset Discrepancy Detection API.
+FastAPI entry point for Asset Discrepancy Detection API.
 
-Features:
-- Health check
+Supports:
 - Image upload
-- YOLO inference
-- Final detection filtering
-- Bounding box rendering
-- Base64 output image response
-
-Endpoints:
-- GET  /health
-- POST /detect
+- URL (image & video)
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
 import numpy as np
 import cv2
-import os
 import base64
 import threading
+import time
 
 from app.model import load_model, get_model
 from app.utils import process_result, draw_boxes
 
 app = FastAPI(
     title="Asset Discrepancy Detection API",
-    description="API for detecting BTS assets such as Panel Antenna, RRU, and Microwave Dish.",
-    version="1.1.0"
+    version="1.2.0"
 )
 
-# ==============================
-# 1. Model Path
-# ==============================
+# ================= CONFIG =================
 MODEL_PATH = "asset-11l-cp03-180.pt"
 MODEL_URL = "https://github.com/eldisja1/asset-discrepancy-nmsai/releases/download/v1.2.0/asset-11l-cp03-180.pt"
-# ==============================
-# 2. Thread Safety Config
-# ==============================
-# Prevent race conditions during inference
-model_lock = threading.Lock()
 
-# Limit the number of concurrent active inferences
+CONF_THRESHOLD = 0.25
+INTERVAL_SEC = 1.0
+MAX_SHOWN = 3
+MAX_VIDEO_SECONDS = 10
+MAX_FRAMES = 30
+
+# ================= THREAD SAFETY =================
+model_lock = threading.Lock()
 batch_semaphore = threading.Semaphore(10)
 
-
-# ==============================
-# 3. Startup Event
-# ==============================
+# ================= STARTUP =================
 @app.on_event("startup")
 def startup_event():
-    """
-    Load the model once when FastAPI starts.
-    If the model file is missing, it will be downloaded automatically.
-    """
     load_model(MODEL_PATH, MODEL_URL)
     print("Model loaded successfully")
 
+# ================= REQUEST =================
+class URLRequest(BaseModel):
+    file_url: str
 
-# ==============================
-# 4. Health Check
-# ==============================
+# ================= HEALTH =================
 @app.get("/health")
 def health():
-    """
-    Simple endpoint to verify that the API is running.
-    """
     return {"status": "ok"}
 
+# ================= IMAGE PROCESS =================
+def process_image(img):
+    model = get_model()
 
-# ==============================
-# 5. Detection Endpoint
-# ==============================
+    with model_lock:
+        results = model(img, conf=CONF_THRESHOLD, verbose=False)[0]
+
+    detections, object_count = process_result(results, model)
+    output = draw_boxes(img.copy(), detections)
+
+    _, buffer = cv2.imencode(".jpg", output)
+    image_base64 = base64.b64encode(buffer).decode("utf-8")
+
+    return detections, object_count, image_base64
+
+# ================= VIDEO PROCESS =================
+def process_video(url: str):
+    cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+
+    if not cap.isOpened():
+        return False, {}, []
+
+    model = get_model()
+
+    best_frames = {}
+    last_bucket = -1
+    frame_count = 0
+    start_time = time.time()
+    found_any = False
+
+    try:
+        while cap.isOpened():
+
+            if time.time() - start_time > MAX_VIDEO_SECONDS:
+                break
+
+            if frame_count >= MAX_FRAMES:
+                break
+
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame_count += 1
+
+            ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            bucket = int(ms // (INTERVAL_SEC * 1000))
+
+            if bucket == last_bucket:
+                continue
+            last_bucket = bucket
+
+            with model_lock:
+                results = model(frame, conf=CONF_THRESHOLD, verbose=False)[0]
+
+            detections, object_count = process_result(results, model)
+
+            if len(detections) > 0:
+                found_any = True
+
+                score = sum([d["confidence"] for d in detections])
+
+                if bucket not in best_frames or score > best_frames[bucket]["score"]:
+                    drawn = draw_boxes(frame.copy(), detections)
+
+                    best_frames[bucket] = {
+                        "score": score,
+                        "frame": drawn,
+                        "counts": object_count
+                    }
+
+    finally:
+        cap.release()
+
+    frames_sorted = sorted(
+        best_frames.items(),
+        key=lambda x: x[1]["score"],
+        reverse=True
+    )[:MAX_SHOWN]
+
+    images = []
+    final_counts = {}
+
+    for _, data in frames_sorted:
+        _, buffer = cv2.imencode(".jpg", data["frame"])
+        img_b64 = base64.b64encode(buffer).decode("utf-8")
+        images.append(img_b64)
+
+        for k, v in data["counts"].items():
+            final_counts[k] = final_counts.get(k, 0) + v
+
+    return found_any, final_counts, images
+
+# ================= ENDPOINT: UPLOAD =================
 @app.post("/detect")
 async def detect(file: UploadFile = File(...)):
-    """
-    Upload an image and run asset detection.
 
-    Supported file types:
-    - image/jpeg
-    - image/png
-    - image/jpg
-
-    Returns:
-        JSONResponse:
-        {
-            "total_objects": int,
-            "counts": dict,
-            "detections": list,
-            "image_base64": str
-        }
-    """
-
-    # ==============================
-    # A. Validate Content-Type
-    # ==============================
     if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid image format. Supported formats: jpg, jpeg, png."
-        )
+        raise HTTPException(status_code=400, detail="Invalid image format")
 
-    # ==============================
-    # B. Limit concurrent inference
-    # ==============================
     with batch_semaphore:
-        try:
-            # ==============================
-            # C. Read uploaded file as OpenCV image
-            # ==============================
-            contents = await file.read()
-            np_arr = np.frombuffer(contents, np.uint8)
-            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        contents = await file.read()
+        np_arr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-            if img is None:
-                raise HTTPException(status_code=400, detail="Invalid image file")
+        if img is None:
+            raise HTTPException(status_code=400, detail="Invalid image")
 
-            # ==============================
-            # D. Get loaded model
-            # ==============================
-            model = get_model()
+        detections, counts, image_base64 = process_image(img)
 
-            # ==============================
-            # E. Thread-safe inference
-            # ==============================
-            # Use low confidence first, then apply manual final filtering
-            with model_lock:
-                results = model(img, conf=0.25, verbose=False)
+        return JSONResponse({
+            "total_objects": sum(counts.values()),
+            "counts": counts,
+            "detections": detections,
+            "image_base64": image_base64
+        })
 
-            result = results[0]
+# ================= ENDPOINT: URL =================
+@app.post("/detect-url")
+def detect_url(data: URLRequest):
 
-            # ==============================
-            # F. Process detection result
-            # ==============================
-            detections, object_count = process_result(result, model)
+    if not data.file_url:
+        raise HTTPException(status_code=400, detail="URL required")
 
-            # ==============================
-            # G. Draw bounding boxes
-            # ==============================
-            output_image = draw_boxes(img.copy(), detections)
+    try:
+        # auto detect image vs video
+        if data.file_url.lower().endswith((".jpg", ".jpeg", ".png")):
+            cap = cv2.VideoCapture(data.file_url)
+            ret, frame = cap.read()
+            cap.release()
 
-            # ==============================
-            # H. Encode output image to base64
-            # ==============================
-            success, buffer = cv2.imencode(".jpg", output_image)
-            if not success:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to encode output image"
-                )
+            if not ret:
+                raise HTTPException(status_code=400, detail="Cannot read image URL")
 
-            image_base64 = base64.b64encode(buffer).decode("utf-8")
+            detections, counts, image_base64 = process_image(frame)
 
-            # ==============================
-            # I. Return clean final response
-            # ==============================
-            return JSONResponse({
-                "total_objects": sum(object_count.values()),
-                "counts": object_count,
+            return {
+                "type": "image",
+                "total_objects": sum(counts.values()),
+                "counts": counts,
                 "detections": detections,
                 "image_base64": image_base64
-            })
+            }
 
-        except HTTPException:
-            raise
+        # else treat as video
+        found, counts, images = process_video(data.file_url)
 
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Inference failed: {str(e)}"
-            )
+        return {
+            "type": "video",
+            "status": "OBJECT DETECTED" if found else "CLEAR",
+            "total_objects": sum(counts.values()),
+            "counts": counts,
+            "total_images": len(images),
+            "images_base64": images
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
