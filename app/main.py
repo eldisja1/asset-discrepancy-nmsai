@@ -28,7 +28,7 @@ app = FastAPI(
 
 # ================= CONFIG =================
 MODEL_PATH = "asset-11l-cp03-180.pt"
-MODEL_URL = "https://github.com/eldisja1/asset-discrepancy-nmsai/releases/download/v1.2.0/asset-11l-cp03-180.pt"
+MODEL_URL = "https://github.com/eldisja1/Asset-Discrepancy-NMSAI/releases/download/v1.2.0/asset-11l-cp03-180.pt"
 
 CONF_THRESHOLD = 0.25
 INTERVAL_SEC = 1.0
@@ -85,6 +85,8 @@ def process_video(url: str):
     start_time = time.time()
     found_any = False
 
+    last_frame = None
+
     try:
         while cap.isOpened():
 
@@ -99,6 +101,7 @@ def process_video(url: str):
                 break
 
             frame_count += 1
+            last_frame = frame.copy()
 
             ms = cap.get(cv2.CAP_PROP_POS_MSEC)
             bucket = int(ms // (INTERVAL_SEC * 1000))
@@ -146,6 +149,35 @@ def process_video(url: str):
         for k, v in data["counts"].items():
             final_counts[k] = final_counts.get(k, 0) + v
 
+    if not found_any and last_frame is not None:
+        fallback_frame = last_frame.copy()
+
+        text = "CLEAR"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.2
+        thickness = 3
+        color = (0, 255, 0)
+
+        (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, thickness)
+
+        x = fallback_frame.shape[1] - text_w - 20
+        y = 40
+
+        cv2.putText(
+            fallback_frame,
+            text,
+            (x, y),
+            font,
+            font_scale,
+            color,
+            thickness
+        )
+
+        _, buffer = cv2.imencode(".jpg", fallback_frame)
+        img_b64 = base64.b64encode(buffer).decode("utf-8")
+
+        images = [img_b64]
+
     return found_any, final_counts, images
 
 # ================= ENDPOINT: UPLOAD =================
@@ -180,8 +212,29 @@ def detect_url(data: URLRequest):
         raise HTTPException(status_code=400, detail="URL required")
 
     try:
-        # auto detect image vs video
-        if data.file_url.lower().endswith((".jpg", ".jpeg", ".png")):
+        url = data.file_url.lower()
+
+        # ================= NEW: WEBM HANDLING =================
+        if url.endswith(".webm"):
+            cap = cv2.VideoCapture(data.file_url, cv2.CAP_FFMPEG)
+            ret, frame = cap.read()
+            cap.release()
+
+            if not ret:
+                raise HTTPException(status_code=400, detail="Cannot read webm URL")
+
+            detections, counts, image_base64 = process_image(frame)
+
+            return {
+                "type": "webm_frame",
+                "total_objects": sum(counts.values()),
+                "counts": counts,
+                "detections": detections,
+                "image_base64": image_base64
+            }
+
+        # image
+        if url.endswith((".jpg", ".jpeg", ".png")):
             cap = cv2.VideoCapture(data.file_url)
             ret, frame = cap.read()
             cap.release()
@@ -199,7 +252,7 @@ def detect_url(data: URLRequest):
                 "image_base64": image_base64
             }
 
-        # else treat as video
+        # video
         found, counts, images = process_video(data.file_url)
 
         return {

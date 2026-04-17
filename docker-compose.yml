@@ -1,5 +1,5 @@
 services:
-  asset-api:
+  asset-discrepancy-api:
     build: .
     container_name: asset-discrepancy-nmsai-api
     ports:

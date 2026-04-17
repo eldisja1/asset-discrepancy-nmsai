@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-RUN wget -O asset-11l-cp03-180.pt https://github.com/eldisja1/asset-discrepancy-nmsai/releases/download/v1.2.0/asset-11l-cp03-180.pt
+RUN wget -O asset-11l-cp03-180.pt https://github.com/mirteldisa01/asset-discrepancy-nmsai/releases/download/v1.2.0/asset-11l-cp03-180.pt
 
 EXPOSE 8000
 

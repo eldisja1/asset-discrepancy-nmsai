@@ -223,7 +223,8 @@ def draw_boxes(image, detections):
         class_name = det["class"]
         confidence = det["confidence"]
 
-        label = f"{class_name} {confidence:.2f}"
+        #label = f"{class_name} {confidence:.2f}"
+        label = f"{class_name}"
 
         box_color = color_map.get(class_name, (255, 255, 255))
         text_color = (255, 255, 255)
